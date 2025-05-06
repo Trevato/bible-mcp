@@ -15,6 +15,15 @@ from bible_api import BibleAPIClient
 # Create a global instance of the Bible API client
 bible_client = BibleAPIClient()
 
+# Constants
+SINGLE_CHAPTER_BOOKS = {
+    "OBAD",  # Obadiah
+    "PHLM",  # Philemon
+    "2JN",   # 2 John
+    "3JN",   # 3 John
+    "JUD"    # Jude
+}
+
 
 # Create the MCP server
 mcp = FastMCP(
@@ -39,11 +48,16 @@ async def get_chapter(translation: str, book: str, chapter: str) -> str:
         String containing the chapter text
     """
     try:
-        data = await bible_client.get_by_book_chapter_verse(
-            translation_id=translation, 
-            book_id=book, 
-            chapter=int(chapter)
-        )
+        # For single-chapter books, we need to handle them specially
+        if book.upper() in SINGLE_CHAPTER_BOOKS:
+            # For single chapter books, treat the chapter parameter as verse
+            data = await bible_client.get_verse_by_reference(f"{book} {chapter}", translation)
+        else:
+            data = await bible_client.get_by_book_chapter_verse(
+                translation_id=translation, 
+                book_id=book, 
+                chapter=int(chapter)
+            )
         
         # Format the chapter text
         return format_chapter(data)
@@ -66,12 +80,17 @@ async def get_verse(translation: str, book: str, chapter: str, verse: str) -> st
         String containing the verse text
     """
     try:
-        data = await bible_client.get_by_book_chapter_verse(
-            translation_id=translation, 
-            book_id=book, 
-            chapter=int(chapter),
-            verse=int(verse)
-        )
+        # For single-chapter books, handle specially
+        if book.upper() in SINGLE_CHAPTER_BOOKS:
+            # For single chapter books, the chapter is actually the verse
+            data = await bible_client.get_verse_by_reference(f"{book} {verse}", translation)
+        else:
+            data = await bible_client.get_by_book_chapter_verse(
+                translation_id=translation, 
+                book_id=book, 
+                chapter=int(chapter),
+                verse=int(verse)
+            )
         
         # Format the verse text
         return format_verse(data)
@@ -91,7 +110,25 @@ async def get_random_verse(translation: str) -> str:
         String containing a random verse
     """
     try:
-        data = await bible_client.get_random_verse(translation_id=translation)
+        # Since bible-api.com doesn't have a true random verse endpoint,
+        # we'll use a small selection of popular verses and pick one randomly
+        import random
+        
+        popular_verses = [
+            "John 3:16",
+            "Psalm 23:1",
+            "Genesis 1:1",
+            "Matthew 28:19",
+            "Romans 8:28",
+            "Philippians 4:13",
+            "Jeremiah 29:11"
+        ]
+        
+        # Randomly select a verse
+        selected_verse = random.choice(popular_verses)
+        
+        # Get the verse
+        data = await bible_client.get_verse_by_reference(selected_verse, translation)
         
         # Format the verse text
         return format_verse(data)
@@ -139,10 +176,38 @@ async def get_random_verse_tool(
         Formatted string containing a random verse
     """
     try:
-        data = await bible_client.get_random_verse(
-            translation_id=translation,
-            book_ids=testament
-        )
+        import random
+        
+        # Define verses by testament
+        ot_verses = [
+            "Genesis 1:1",
+            "Psalm 23:1",
+            "Isaiah 40:31",
+            "Jeremiah 29:11",
+            "Proverbs 3:5-6"
+        ]
+        
+        nt_verses = [
+            "John 3:16",
+            "Matthew 28:19",
+            "Romans 8:28",
+            "Philippians 4:13",
+            "1 Corinthians 13:4"
+        ]
+        
+        # Select verses based on testament parameter
+        if testament == "OT":
+            verses = ot_verses
+        elif testament == "NT":
+            verses = nt_verses
+        else:
+            verses = ot_verses + nt_verses
+        
+        # Randomly select a verse
+        selected_verse = random.choice(verses)
+        
+        # Get the verse
+        data = await bible_client.get_verse_by_reference(selected_verse, translation)
         return format_verse(data)
     except Exception as e:
         return f"Error: {str(e)}"
