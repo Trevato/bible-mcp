@@ -7,9 +7,11 @@ for searching and retrieving Bible content.
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 import asyncio
+import random
 from typing import Dict, List, Optional, Any
 
 from mcp.server.fastmcp import FastMCP, Context, Image
+import mcp.types as types
 from bible_api import BibleAPIClient
 
 # Create a global instance of the Bible API client
@@ -23,7 +25,6 @@ SINGLE_CHAPTER_BOOKS = {
     "3JN",   # 3 John
     "JUD"    # Jude
 }
-
 
 # Create the MCP server
 mcp = FastMCP(
@@ -293,12 +294,13 @@ def format_verse(data: Dict) -> str:
     Returns:
         Formatted string with verse information
     """
-    result = f"📖 {data.get('reference', 'Unknown reference')}\n"
-    result += f"📝 {data.get('translation_name', 'Unknown translation')}\n\n"
+    reference = data.get('reference', 'Unknown reference')
+    translation = data.get('translation_name', 'Unknown translation')
     
     # Add text, cleaning up any extra newlines
     text = data.get('text', '').strip()
-    result += text
+    
+    result = f"📖 {reference}\n📝 {translation}\n\n{text}"
     
     return result
 
@@ -316,17 +318,37 @@ def format_chapter(data: Dict) -> str:
     # For chapters, the format is similar but may contain multiple verses
     if "reference" in data:
         # Extract book and chapter from reference
-        ref_parts = data.get('reference', '').split(':')[0]
-        result = f"📖 {ref_parts}\n"
-        result += f"📝 {data.get('translation_name', 'Unknown translation')}\n\n"
+        reference = data.get('reference', '')
+        translation = data.get('translation_name', 'Unknown translation')
         
+        # We might have a colon in the reference for chapter:verse, extract just the chapter part
+        if ':' in reference:
+            ref_parts = reference.split(':')[0]  # Just get the book and chapter
+        else:
+            ref_parts = reference
+            
         # Add text, cleaning up any extra newlines
         text = data.get('text', '').strip()
-        result += text
+        
+        result = f"📖 {ref_parts}\n📝 {translation}\n\n{text}"
     else:
-        # Handle parameterized API response which may have a different structure
-        result = "Chapter content:\n\n"
-        result += str(data)  # Simplified for now, may need adjustment based on actual API response
+        # If we don't have a reference in the data, create a better fallback
+        # This handles cases where the API returns a different structure
+        verses = data.get('verses', [])
+        if verses and len(verses) > 0:
+            # Try to extract info from the verses array
+            first_verse = verses[0]
+            book_name = first_verse.get('book_name', 'Unknown book')
+            chapter = first_verse.get('chapter', '?')
+            reference = f"{book_name} {chapter}"
+            
+            # Combine all verse texts
+            text = "\n\n".join([v.get('text', '').strip() for v in verses])
+            
+            result = f"📖 {reference}\n📝 {data.get('translation_name', 'Unknown translation')}\n\n{text}"
+        else:
+            # Last resort fallback
+            result = f"Chapter content:\n\n{str(data)}"
     
     return result
 

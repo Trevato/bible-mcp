@@ -8,4 +8,5 @@
 - ✅ Fix URI parameter mismatch (removed ctx parameter from resource handlers)
 - ✅ Add handling for single-chapter books
 - ✅ Implement custom random verse functionality
-- Test and refine
+- ✅ Fix content formatting functions
+- Tests running, resource listing may be partial
