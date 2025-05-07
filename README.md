@@ -33,7 +33,7 @@ pip install -e .
 ```
 
 Requirements:
-- Python 3.9+
+- Python 3.10+
 - Dependencies are managed via `pyproject.toml`
 
 ## Usage

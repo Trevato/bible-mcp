@@ -442,13 +442,24 @@ def get_random_book(testament: Optional[str] = None) -> str:
         
     Returns:
         A random book ID (e.g., "JHN", "GEN")
+        
+    Raises:
+        ValueError: If an invalid testament is specified
     """
+    # Validate testament parameter if provided
+    if testament and testament not in (OLD_TESTAMENT, NEW_TESTAMENT):
+        raise ValueError(f"Invalid testament: {testament}. Must be 'OT', 'NT', or None.")
+    
     # Filter books by testament if requested
     if testament:
         books = [book_id for book_id, data in BIBLE_DATA.items() 
                 if data["testament"] == testament]
     else:
         books = list(BIBLE_DATA.keys())
+    
+    # Safety check in case filtering resulted in empty list
+    if not books:
+        raise ValueError(f"No books found for testament: {testament}")
     
     # Return a random book ID
     return random.choice(books)

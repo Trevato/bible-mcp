@@ -3,6 +3,8 @@ Bible API client for interacting with bible-api.com.
 """
 import httpx
 import random
+import asyncio
+import time
 from typing import Dict, List, Optional, Any, Tuple, Union
 
 from bible_data import (
@@ -22,6 +24,49 @@ class BibleAPIClient:
     using both the User Input API and the Parameterized API.
     """
     BASE_URL = "https://bible-api.com"
+    _last_request_time = 0
+    _request_delay = 1.0  # 1 second delay between requests
+    
+    async def _make_request(self, url: str) -> Dict:
+        """
+        Make a rate-limited request to the Bible API with retry logic for 429 errors.
+        
+        Args:
+            url: The URL to request
+            
+        Returns:
+            Dictionary containing the response JSON
+            
+        Raises:
+            ValueError: If the reference is not found
+            httpx.HTTPStatusError: For other HTTP errors
+            httpx.RequestError: For request failures
+        """
+        # Implement rate limiting
+        current_time = time.time()
+        elapsed = current_time - self._last_request_time
+        if elapsed < self._request_delay:
+            await asyncio.sleep(self._request_delay - elapsed)
+        
+        # Make the request
+        async with httpx.AsyncClient() as client:
+            try:
+                self._last_request_time = time.time()
+                response = await client.get(url)
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 404:
+                    raise ValueError(f"Reference not found: {url}")
+                elif e.response.status_code == 429:
+                    # If we hit rate limiting, wait and retry
+                    await asyncio.sleep(self._request_delay * 2)
+                    self._last_request_time = time.time()
+                    response = await client.get(url)
+                    response.raise_for_status()
+                    return response.json()
+                else:
+                    raise e
     
     async def get_verse_by_reference(self, reference: str, translation: Optional[str] = None) -> Dict:
         """
@@ -35,6 +80,7 @@ class BibleAPIClient:
             Dictionary containing the verse data
             
         Raises:
+            ValueError: If the reference is not found
             httpx.HTTPStatusError: If the API request returns an error status code
             httpx.RequestError: If the request fails for other reasons
         """
@@ -42,16 +88,7 @@ class BibleAPIClient:
         if translation:
             url += f"?translation={translation}"
             
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.get(url)
-                response.raise_for_status()  # Raise exception for 4XX/5XX responses
-                return response.json()
-            except httpx.HTTPStatusError as e:
-                if e.response.status_code == 404:
-                    raise ValueError(f"Reference not found: {reference}")
-                else:
-                    raise e
+        return await self._make_request(url)
     
     async def get_by_book_chapter_verse(
         self, 
@@ -91,16 +128,7 @@ class BibleAPIClient:
         if translation_id:
             url += f"?translation={translation_id}"
             
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.get(url)
-                response.raise_for_status()
-                return response.json()
-            except httpx.HTTPStatusError as e:
-                if e.response.status_code == 404:
-                    raise ValueError(f"Reference not found: {reference}")
-                else:
-                    raise e
+        return await self._make_request(url)
     
     async def get_random_verse(
         self, 
