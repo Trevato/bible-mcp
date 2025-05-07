@@ -12,6 +12,18 @@ A Model Context Protocol server that exposes Bible content from bible-api.com fo
 - Testament filtering (OT/NT) for random verses
 - Comprehensive error handling
 
+## Add to Claude config
+
+```
+"Bible MCP": {
+    "command": "uvx",
+    "args": [
+    "bible-mcp"
+    ]
+}
+
+```
+
 ## Installation
 
 ### From PyPI (recommended)
