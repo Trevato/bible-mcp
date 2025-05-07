@@ -2,7 +2,16 @@
 Bible API client for interacting with bible-api.com.
 """
 import httpx
+import random
 from typing import Dict, List, Optional, Any, Tuple, Union
+
+from bible_data import (
+    get_random_reference, 
+    get_book_testament, 
+    is_valid_reference,
+    OLD_TESTAMENT,
+    NEW_TESTAMENT
+)
 
 
 class BibleAPIClient:
@@ -24,15 +33,25 @@ class BibleAPIClient:
             
         Returns:
             Dictionary containing the verse data
+            
+        Raises:
+            httpx.HTTPStatusError: If the API request returns an error status code
+            httpx.RequestError: If the request fails for other reasons
         """
         url = f"{self.BASE_URL}/{reference}"
         if translation:
             url += f"?translation={translation}"
             
         async with httpx.AsyncClient() as client:
-            response = await client.get(url)
-            response.raise_for_status()  # Raise exception for 4XX/5XX responses
-            return response.json()
+            try:
+                response = await client.get(url)
+                response.raise_for_status()  # Raise exception for 4XX/5XX responses
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 404:
+                    raise ValueError(f"Reference not found: {reference}")
+                else:
+                    raise e
     
     async def get_by_book_chapter_verse(
         self, 
@@ -52,7 +71,16 @@ class BibleAPIClient:
             
         Returns:
             Dictionary containing the verse data
+            
+        Raises:
+            ValueError: If the reference is invalid
+            httpx.HTTPStatusError: If the API request returns an error status code
+            httpx.RequestError: If the request fails for other reasons
         """
+        # Validate the reference
+        if not is_valid_reference(book_id, chapter, verse):
+            raise ValueError(f"Invalid reference: {book_id} {chapter}:{verse if verse else ''}")
+        
         # Construct a reference string
         if verse is not None:
             reference = f"{book_id} {chapter}:{verse}"
@@ -64,44 +92,45 @@ class BibleAPIClient:
             url += f"?translation={translation_id}"
             
         async with httpx.AsyncClient() as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            return response.json()
+            try:
+                response = await client.get(url)
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 404:
+                    raise ValueError(f"Reference not found: {reference}")
+                else:
+                    raise e
     
     async def get_random_verse(
         self, 
         translation_id: str = "web", 
-        book_ids: Optional[Union[List[str], str]] = None
+        testament: Optional[str] = None
     ) -> Dict:
         """
         Get a random verse from the Bible.
         
         Args:
             translation_id: Translation identifier (default: "web")
-            book_ids: Optional list of book IDs or special string "OT" or "NT"
+            testament: Optional filter for "OT" (Old Testament) or "NT" (New Testament)
             
         Returns:
             Dictionary containing the random verse data
-        """
-        # Since bible-api.com doesn't have a dedicated random endpoint in the format we expected,
-        # we need to use a different approach. For now, we'll use a fixed verse as a fallback.
-        # In a real implementation, you might want to have a list of verses and select one randomly.
-        
-        # This is a simplified fallback implementation
-        reference = "John 3:16"  # Default fallback
-        
-        # Enhance this method in a production implementation
-        # For example, you could maintain a list of book IDs and randomly select chapters/verses
-        
-        # For now, we'll just return the default verse
-        url = f"{self.BASE_URL}/{reference}"
-        if translation_id:
-            url += f"?translation={translation_id}"
             
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            return response.json()
+        Raises:
+            ValueError: If an invalid testament is specified
+            httpx.HTTPStatusError: If the API request returns an error status code
+            httpx.RequestError: If the request fails for other reasons
+        """
+        # Validate testament parameter if provided
+        if testament and testament not in (OLD_TESTAMENT, NEW_TESTAMENT):
+            raise ValueError(f"Invalid testament: {testament}. Must be 'OT', 'NT', or None.")
+        
+        # Get a random reference using the bible_data module
+        random_reference = get_random_reference(testament)
+        
+        # Get the verse
+        return await self.get_verse_by_reference(random_reference, translation_id)
             
     async def list_translations(self) -> List[Dict]:
         """

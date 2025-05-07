@@ -1,9 +1,45 @@
 [project]
 name = "bible-mcp"
 version = "0.1.0"
-description = "Add your description here"
+description = "Model Context Protocol (MCP) server for Bible content"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.9"
+license = {file = "LICENSE"}
+authors = [
+    {name = "trevato", email = "contact@trevato.dev"}
+]
+maintainers = [
+    {name = "trevato", email = "contact@trevato.dev"}
+]
+keywords = ["mcp", "bible", "llm", "claude", "ai"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Religion",
+]
 dependencies = [
     "mcp[cli]>=1.7.1",
+    "httpx>=0.24.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/trevato/bible-mcp"
+Documentation = "https://github.com/trevato/bible-mcp#readme"
+Repository = "https://github.com/trevato/bible-mcp.git"
+Issues = "https://github.com/trevato/bible-mcp/issues"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

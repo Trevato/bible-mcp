@@ -4,27 +4,20 @@ MCP Server for Bible content using bible-api.com.
 This server provides Bible verses and chapters as resources and tools
 for searching and retrieving Bible content.
 """
-from contextlib import asynccontextmanager
-from collections.abc import AsyncIterator
-import asyncio
-import random
 from typing import Dict, List, Optional, Any
 
-from mcp.server.fastmcp import FastMCP, Context, Image
+from mcp.server.fastmcp import FastMCP, Context
 import mcp.types as types
 from bible_api import BibleAPIClient
+from bible_data import (
+    SINGLE_CHAPTER_BOOKS, 
+    OLD_TESTAMENT, 
+    NEW_TESTAMENT,
+    get_random_reference
+)
 
 # Create a global instance of the Bible API client
 bible_client = BibleAPIClient()
-
-# Constants
-SINGLE_CHAPTER_BOOKS = {
-    "OBAD",  # Obadiah
-    "PHLM",  # Philemon
-    "2JN",   # 2 John
-    "3JN",   # 3 John
-    "JUD"    # Jude
-}
 
 # Create the MCP server
 mcp = FastMCP(
@@ -62,6 +55,8 @@ async def get_chapter(translation: str, book: str, chapter: str) -> str:
         
         # Format the chapter text
         return format_chapter(data)
+    except ValueError as e:
+        return f"Error: {str(e)}"
     except Exception as e:
         return f"Error retrieving chapter: {str(e)}"
 
@@ -95,6 +90,8 @@ async def get_verse(translation: str, book: str, chapter: str, verse: str) -> st
         
         # Format the verse text
         return format_verse(data)
+    except ValueError as e:
+        return f"Error: {str(e)}"
     except Exception as e:
         return f"Error retrieving verse: {str(e)}"
 
@@ -111,28 +108,13 @@ async def get_random_verse(translation: str) -> str:
         String containing a random verse
     """
     try:
-        # Since bible-api.com doesn't have a true random verse endpoint,
-        # we'll use a small selection of popular verses and pick one randomly
-        import random
-        
-        popular_verses = [
-            "John 3:16",
-            "Psalm 23:1",
-            "Genesis 1:1",
-            "Matthew 28:19",
-            "Romans 8:28",
-            "Philippians 4:13",
-            "Jeremiah 29:11"
-        ]
-        
-        # Randomly select a verse
-        selected_verse = random.choice(popular_verses)
-        
-        # Get the verse
-        data = await bible_client.get_verse_by_reference(selected_verse, translation)
+        # Use the improved get_random_verse method from the API client
+        data = await bible_client.get_random_verse(translation_id=translation)
         
         # Format the verse text
         return format_verse(data)
+    except ValueError as e:
+        return f"Error: {str(e)}"
     except Exception as e:
         return f"Error retrieving random verse: {str(e)}"
 
@@ -140,12 +122,11 @@ async def get_random_verse(translation: str) -> str:
 # === TOOLS ===
 
 @mcp.tool()
-async def get_verse_by_reference(ctx: Context, reference: str, translation: Optional[str] = "web") -> str:
+async def get_verse_by_reference(reference: str, translation: Optional[str] = "web") -> str:
     """
     Get verse(s) by reference string.
     
     Args:
-        ctx: MCP context
         reference: Bible reference (e.g., "John 3:16", "Matthew 5:1-10")
         translation: Translation ID (default: "web")
         
@@ -155,13 +136,14 @@ async def get_verse_by_reference(ctx: Context, reference: str, translation: Opti
     try:
         data = await bible_client.get_verse_by_reference(reference, translation)
         return format_verse(data)
+    except ValueError as e:
+        return f"Error: {str(e)}"
     except Exception as e:
         return f"Error: {str(e)}"
 
 
 @mcp.tool()
 async def get_random_verse_tool(
-    ctx: Context,
     translation: str = "web", 
     testament: Optional[str] = None
 ) -> str:
@@ -169,7 +151,6 @@ async def get_random_verse_tool(
     Get a random verse from the Bible.
     
     Args:
-        ctx: MCP context
         translation: Translation ID (default: "web")
         testament: Optional filter for "OT" (Old Testament) or "NT" (New Testament)
         
@@ -177,50 +158,25 @@ async def get_random_verse_tool(
         Formatted string containing a random verse
     """
     try:
-        import random
+        # Validate testament parameter if provided
+        if testament and testament not in (OLD_TESTAMENT, NEW_TESTAMENT):
+            return f"Error: Invalid testament: {testament}. Must be 'OT', 'NT', or None."
         
-        # Define verses by testament
-        ot_verses = [
-            "Genesis 1:1",
-            "Psalm 23:1",
-            "Isaiah 40:31",
-            "Jeremiah 29:11",
-            "Proverbs 3:5-6"
-        ]
-        
-        nt_verses = [
-            "John 3:16",
-            "Matthew 28:19",
-            "Romans 8:28",
-            "Philippians 4:13",
-            "1 Corinthians 13:4"
-        ]
-        
-        # Select verses based on testament parameter
-        if testament == "OT":
-            verses = ot_verses
-        elif testament == "NT":
-            verses = nt_verses
-        else:
-            verses = ot_verses + nt_verses
-        
-        # Randomly select a verse
-        selected_verse = random.choice(verses)
-        
-        # Get the verse
-        data = await bible_client.get_verse_by_reference(selected_verse, translation)
+        # Get a random verse using the API client's improved method
+        data = await bible_client.get_random_verse(translation_id=translation, testament=testament)
         return format_verse(data)
+    except ValueError as e:
+        return f"Error: {str(e)}"
     except Exception as e:
         return f"Error: {str(e)}"
 
 
 @mcp.tool()
-async def list_available_translations(ctx: Context) -> str:
+async def list_available_translations() -> str:
     """
     List all available Bible translations.
     
     Args:
-        ctx: MCP context
         
     Returns:
         Formatted string containing translation information
@@ -294,6 +250,9 @@ def format_verse(data: Dict) -> str:
     Returns:
         Formatted string with verse information
     """
+    if not data:
+        return "Error: No verse data received"
+    
     reference = data.get('reference', 'Unknown reference')
     translation = data.get('translation_name', 'Unknown translation')
     
@@ -315,6 +274,9 @@ def format_chapter(data: Dict) -> str:
     Returns:
         Formatted string with chapter information
     """
+    if not data:
+        return "Error: No chapter data received"
+    
     # For chapters, the format is similar but may contain multiple verses
     if "reference" in data:
         # Extract book and chapter from reference
