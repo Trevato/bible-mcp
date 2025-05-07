@@ -9,3 +9,6 @@ wheels/
 # Virtual environments
 .venv
 __pycache__/
+
+.DS_Store
+scratchpad.md
